@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  annotations:
+  labels:
+    job-name: example-job
+    myjob: test
+  name: example-job
+spec:
+  completions: 1
+  parallelism: 1
+  selector:
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        job-name: example-job
+      name: example-job
+    spec:
+      containers:
+      - args:
+        - -Mbignum=bpi
+        - -wle
+        - print bpi(2000)
+        command:
+        - perl
+        image: perl
+        imagePullPolicy: Always
+        name: pi
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Never
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status: {}
