@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"github.com/sanity-io/litter"
 	"log"
+	"os"
 
 	batchv1 "k8s.io/api/batch/v1"
+	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/client-go/informers"
@@ -13,6 +15,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 )
+
+var namespace = os.Getenv("NAMESPACE")
 
 func main() {
 
@@ -29,13 +33,60 @@ func main() {
 		log.Fatal(err)
 	}
 
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:         "example-job2",
+			GenerateName: "",
+			Namespace:    namespace,
+			Generation:   0,
+			Labels: map[string]string{
+				"job-name": "example-job2",
+				"app":      "sba",
+			},
+		},
+		Spec: batchv1.JobSpec{
+			Template: apiv1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "example-job",
+					Labels: map[string]string{
+						"job-name": "example-job2",
+						"app":      "sba",
+					},
+				},
+				Spec: apiv1.PodSpec{
+					Containers: []apiv1.Container{
+						apiv1.Container{
+							Name:  "pi",
+							Image: "perl",
+							Command: []string{
+								"perl",
+							},
+							Args: []string{
+								"-Mbignum=bpi",
+								"-wle",
+								"print bpi(2000)",
+							},
+						},
+					},
+					RestartPolicy: "Never",
+				},
+			},
+		},
+	}
+	jobsClient := clientset.BatchV1().Jobs(namespace)
+	result, err := jobsClient.Create(job)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("Created job %q.\n", result.GetObjectMeta().GetName())
 	fmt.Printf("Setting up the informer\n")
 	//factory := informers.NewSharedInformerFactory(clientset, 0)
 
 	factory := informers.NewFilteredSharedInformerFactory(
 		clientset,
 		0,
-		"default",
+		namespace,
 		func(opt *metav1.ListOptions) {
 			opt.LabelSelector = "app=sba"
 		},
@@ -81,15 +132,17 @@ func main() {
 			litter.Dump(newJob.Status.Succeeded)
 			// Here we can delete the job?
 
-			fmt.Printf("Deleting job %s from namespace %s\n", newJob.Name, newJob.Namespace)
+			if newJob.ObjectMeta.DeletionTimestamp == nil {
+				fmt.Printf("Deleting job %s from namespace %s\n", newJob.Name, newJob.Namespace)
 
-			fg := metav1.DeletePropagationForeground
-			deleteOptions := metav1.DeleteOptions{PropagationPolicy: &fg}
+				fg := metav1.DeletePropagationForeground
+				deleteOptions := metav1.DeleteOptions{PropagationPolicy: &fg}
 
-			if err := clientset.BatchV1().Jobs(newJob.Namespace).Delete(newJob.Name, &deleteOptions); err != nil {
-				fmt.Printf("Failed to delete job: %s\n", err)
+				if err := clientset.BatchV1().Jobs(newJob.Namespace).Delete(newJob.Name, &deleteOptions); err != nil {
+					fmt.Printf("Failed to delete job: %s\n", err)
+				}
+				fmt.Printf("Job deleted\n")
 			}
-			fmt.Printf("Job deleted\n")
 		},
 	})
 
