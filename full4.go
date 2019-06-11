@@ -4,21 +4,26 @@ import (
 	"fmt"
 	"github.com/sanity-io/litter"
 	"log"
-	"os"
 
 	batchv1 "k8s.io/api/batch/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/spf13/viper"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-var namespace = os.Getenv("NAMESPACE")
-
 func main() {
+
+	viper.BindEnv("namespace")
+	viper.SetDefault("Namespace", "default")
+
+	namespace := viper.GetString("namespace") // case-insensitive Setting & Getting
+
+	fmt.Printf("Namespace: %s", namespace)
 
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
 	overrides := &clientcmd.ConfigOverrides{}
